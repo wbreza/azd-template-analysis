@@ -19,6 +19,20 @@ type Template struct {
 	Tags        []string `json:"tags"`
 }
 
+func Load(path string) ([]*Template, error) {
+	templateBytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %s: %w", path, err)
+	}
+
+	var templates []*Template
+	if err := json.Unmarshal(templateBytes, &templates); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal file %s: %w", path, err)
+	}
+
+	return templates, nil
+}
+
 func GetTemplates(url string) ([]*Template, error) {
 	res, err := http.Get(url)
 	if err != nil {
