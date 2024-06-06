@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/wbreza/azd-template-analysis/project"
 	"github.com/wbreza/azd-template-analysis/templates"
@@ -52,6 +53,7 @@ func AnalyzeTemplate(ctx AnalysisContext, template *templates.Template) (*Segmen
 	analysisFuncs := []analysisFunc{
 		analyzeHooks,
 		analyzeProject,
+		analyzeTemplate,
 	}
 
 	for _, f := range analysisFuncs {
@@ -61,6 +63,14 @@ func AnalyzeTemplate(ctx AnalysisContext, template *templates.Template) (*Segmen
 	}
 
 	return root, nil
+}
+
+func analyzeTemplate(ctx AnalysisContext, template *templates.Template, analysis *Segment) error {
+	analysis.Insights["tagCount"] = len(template.Author)
+	analysis.Insights["isCommunity"] = slices.Contains(template.Tags, "community")
+	analysis.Insights["isMsft"] = slices.Contains(template.Tags, "msft")
+
+	return nil
 }
 
 func analyzeProject(ctx AnalysisContext, template *templates.Template, analysis *Segment) error {
@@ -155,7 +165,11 @@ func analyzeHooks(ctx AnalysisContext, template *templates.Template, analysis *S
 	hooksRootSegment := NewSegment()
 	analysis.Segments["hooks"] = hooksRootSegment
 
+	totalLocCount := 0
+
 	for hookName, hook := range azdProject.Hooks {
+		locCount := 0
+
 		hookSegment := NewSegment()
 		hooksRootSegment.Segments[hookName] = hookSegment
 
@@ -205,7 +219,8 @@ func analyzeHooks(ctx AnalysisContext, template *templates.Template, analysis *S
 			if err != nil {
 				hookSegment.Errors = append(hookSegment.Errors, fmt.Sprintf("Failed reading embedded script '%s': %v", embeddedScriptPath, err))
 			} else {
-				allScripts[scriptPath] = string(scriptBytes)
+				hookScript := string(scriptBytes)
+				allScripts[scriptPath] = hookScript
 			}
 		}
 
@@ -215,7 +230,16 @@ func analyzeHooks(ctx AnalysisContext, template *templates.Template, analysis *S
 				hookSegment.Insights[heuristicKey] = heuristic.MatchString(script)
 			}
 		}
+
+		for _, script := range allScripts {
+			locCount += len(strings.Split(script, "\n"))
+		}
+
+		hookSegment.Insights["loc"] = locCount
+		totalLocCount += locCount
 	}
+
+	hooksRootSegment.Insights["loc"] = totalLocCount
 
 	hookNames := []string{
 		"restore",

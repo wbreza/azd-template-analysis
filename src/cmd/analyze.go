@@ -78,7 +78,7 @@ func newAnalyzeCmd(root *cobra.Command) {
 				return fmt.Errorf("failed to write results: %w", err)
 			}
 
-			rootFilePath := filepath.Join(flags.filePath, "results.csv")
+			rootFilePath := filepath.Join(flags.filePath, "templates.csv")
 			rootMetrics, err := writeAnalysisToCsv(rootFilePath, allResults, "", false)
 			if err != nil {
 				return fmt.Errorf("failed to write root analysis to csv: %w", err)
@@ -187,17 +187,52 @@ func writeAnalysisToCsv(filePath string, allResults []*analyze.TemplateWithResul
 	for _, insightKey := range allInsightKeys {
 		count := 0
 
+		isBool := false
+		isNumber := true
+
 		for _, result := range allResults {
+			var intVal int
+			var boolVal bool
+
 			value := analyze.GetInsight(result.Analysis, insightKey)
-			boolVal, ok := value.(bool)
-			if ok && boolVal {
+
+			switch v := value.(type) {
+			case int:
+				isNumber = true
+				intVal = int(v)
+			case int32:
+				isNumber = true
+				intVal = int(v)
+			case int64:
+				isNumber = true
+				intVal = int(v)
+			case float32:
+				isNumber = true
+				intVal = int(v)
+			case float64:
+				isNumber = true
+				intVal = int(v)
+			case bool:
+				isBool = true
+				boolVal = value.(bool)
+			}
+
+			if isBool && boolVal {
 				count++
+			}
+
+			if isNumber {
+				count += intVal
 			}
 		}
 
 		// Calculate the percentage
 		if segmentCount > 0 {
-			insightMetrics[insightKey] = fmt.Sprintf("%d%%", int(math.Round((float64(count)/float64(segmentCount))*100)))
+			if isBool {
+				insightMetrics[insightKey] = fmt.Sprintf("%d%%", int(math.Round((float64(count)/float64(segmentCount))*100)))
+			} else if isNumber {
+				insightMetrics[insightKey] = fmt.Sprintf("%.2f (Avg)", float32(count)/float32(segmentCount))
+			}
 		} else {
 			insightMetrics[insightKey] = "N/A"
 		}
