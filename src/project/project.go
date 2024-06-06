@@ -30,7 +30,8 @@ type Hook struct {
 }
 
 type Service struct {
-	Host string `json:"host"`
+	Host     string `json:"host"`
+	Language string `json:"language"`
 }
 
 func Load(path string) (*Project, error) {

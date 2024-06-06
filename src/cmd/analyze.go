@@ -4,8 +4,11 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -37,7 +40,7 @@ func newAnalyzeCmd(root *cobra.Command) {
 				return fmt.Errorf("failed to load templates: %w", err)
 			}
 
-			resultMap := map[string]*analyze.TemplateWithResults{}
+			allResults := []*analyze.TemplateWithResults{}
 
 			analysisCtx := analyze.AnalysisContext{
 				WorkingDirectory: flags.filePath,
@@ -46,11 +49,11 @@ func newAnalyzeCmd(root *cobra.Command) {
 			for _, template := range templateList {
 				if flags.template == "" || flags.template == template.Source {
 					templateDir := filepath.Join(flags.filePath, filepath.Base(template.Source))
-					var templateAnalysis *analyze.TemplateAnalysis
+					var templateAnalysis *analyze.Segment
 
 					templateAnalysis, err = analyze.AnalyzeTemplate(analysisCtx, template)
 					if err != nil {
-						templateAnalysis = &analyze.TemplateAnalysis{
+						templateAnalysis = &analyze.Segment{
 							Errors: []string{err.Error()},
 						}
 
@@ -59,16 +62,11 @@ func newAnalyzeCmd(root *cobra.Command) {
 						color.Green("Template '%s' analyzed successfully.", templateDir)
 					}
 
-					resultMap[templateDir] = &analyze.TemplateWithResults{
+					allResults = append(allResults, &analyze.TemplateWithResults{
 						Template: template,
 						Analysis: templateAnalysis,
-					}
+					})
 				}
-			}
-
-			allResults := []*analyze.TemplateWithResults{}
-			for _, v := range resultMap {
-				allResults = append(allResults, v)
 			}
 
 			resultBytes, err := json.MarshalIndent(allResults, "", " ")
@@ -80,56 +78,21 @@ func newAnalyzeCmd(root *cobra.Command) {
 				return fmt.Errorf("failed to write results: %w", err)
 			}
 
-			csvFile, err := os.Create(filepath.Join(flags.filePath, "results.csv"))
+			rootFilePath := filepath.Join(flags.filePath, "results.csv")
+			rootMetrics, err := writeAnalysisToCsv(rootFilePath, allResults, "", false)
 			if err != nil {
-				return fmt.Errorf("failed to create csv file: %w", err)
+				return fmt.Errorf("failed to write root analysis to csv: %w", err)
 			}
 
-			csvWriter := csv.NewWriter(csvFile)
-			defer csvWriter.Flush()
-			defer csvFile.Close()
+			writeMetrics("Root", "Based on all templates", rootMetrics)
 
-			csvWriter.Write([]string{
-				"Template",
-				"Repo",
-				"Author",
-				"Missing azure.yaml",
-				"Has Project Hooks",
-				"Uses az login",
-				"Uses azd",
-				"Has Workflows",
-				"Has Metadata",
-				"Has Services",
-				"App Service",
-				"Container App",
-				"Function App",
-				"Spring App",
-				"AKS",
-				"Static Web App",
-				"AI Endpoint",
-			})
-
-			for _, result := range allResults {
-				csvWriter.Write([]string{
-					result.Template.Title,
-					result.Template.Source,
-					result.Template.Author,
-					fmt.Sprint(result.Analysis.Insights["missingAzureYamlAtRoot"]),
-					fmt.Sprint(result.Analysis.Insights["hasProjectHooks"]),
-					fmt.Sprint(result.Analysis.Insights["usesAzLogin"]),
-					fmt.Sprint(result.Analysis.Insights["usesAzd"]),
-					fmt.Sprint(result.Analysis.Insights["hasWorkflows"]),
-					fmt.Sprint(result.Analysis.Insights["hasMetadata"]),
-					fmt.Sprint(result.Analysis.Insights["hasServices"]),
-					fmt.Sprint(result.Analysis.Insights["usesAppService"]),
-					fmt.Sprint(result.Analysis.Insights["usesContainerApps"]),
-					fmt.Sprint(result.Analysis.Insights["usesFunctionApps"]),
-					fmt.Sprint(result.Analysis.Insights["usesSpringApps"]),
-					fmt.Sprint(result.Analysis.Insights["usesAks"]),
-					fmt.Sprint(result.Analysis.Insights["usesStaticWebApps"]),
-					fmt.Sprint(result.Analysis.Insights["usesAiEndpoint"]),
-				})
+			hooksFilePath := filepath.Join(flags.filePath, "hooks.csv")
+			hookMetrics, err := writeAnalysisToCsv(hooksFilePath, allResults, "hooks", true)
+			if err != nil {
+				return fmt.Errorf("failed to write hooks analysis to csv: %w", err)
 			}
+
+			writeMetrics("Hooks", "Based on templates that use hooks", hookMetrics)
 
 			return nil
 		},
@@ -139,4 +102,130 @@ func newAnalyzeCmd(root *cobra.Command) {
 	analyze.Flags().StringVarP(&flags.filePath, "file", "f", "", "Path to the template sync directory.")
 
 	root.AddCommand(analyze)
+}
+
+func writeMetrics(title string, description string, metrics map[string]string) {
+	sortedKeys := []string{}
+	for k := range metrics {
+		sortedKeys = append(sortedKeys, k)
+	}
+	sort.Strings(sortedKeys)
+
+	fmt.Println()
+	color.HiWhite("%s Metrics: (%s)", title, description)
+	for _, key := range sortedKeys {
+		color.HiBlack("%s: %s", key, metrics[key])
+	}
+}
+
+func writeAnalysisToCsv(filePath string, allResults []*analyze.TemplateWithResults, segmentFilter string, recursive bool) (map[string]string, error) {
+	csvFile, err := os.Create(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create csv file: %w", err)
+	}
+
+	csvWriter := csv.NewWriter(csvFile)
+	allInsightKeys := []string{}
+
+	segmentCount := 0
+
+	for _, result := range allResults {
+		segment := result.Analysis
+		if segmentFilter != "" {
+			if analyze.HasSegment(result.Analysis, segmentFilter) {
+				segment = result.Analysis.Segments[segmentFilter]
+			} else {
+				continue
+			}
+		}
+
+		segmentCount++
+		resultKeys := getInsightKeys(segment, recursive)
+		for _, key := range resultKeys {
+			if !slices.Contains(allInsightKeys, key) {
+				allInsightKeys = append(allInsightKeys, key)
+			}
+		}
+	}
+
+	sort.Strings(allInsightKeys)
+
+	headers := []string{"Template", "Repo", "Author"}
+	headers = append(headers, allInsightKeys...)
+
+	csvWriter.Write(headers)
+
+	for _, result := range allResults {
+		segment := result.Analysis
+		if segmentFilter != "" {
+			if analyze.HasSegment(result.Analysis, segmentFilter) {
+				segment = result.Analysis.Segments[segmentFilter]
+			} else {
+				continue
+			}
+		}
+
+		values := []string{
+			result.Template.Title,
+			result.Template.Source,
+			result.Template.Author,
+		}
+
+		for _, insightKey := range allInsightKeys {
+			insightValue := analyze.GetInsight(segment, insightKey)
+			values = append(values, fmt.Sprint(insightValue))
+		}
+
+		csvWriter.Write(values)
+	}
+
+	csvWriter.Flush()
+	csvFile.Close()
+
+	insightMetrics := map[string]string{}
+
+	for _, insightKey := range allInsightKeys {
+		count := 0
+
+		for _, result := range allResults {
+			value := analyze.GetInsight(result.Analysis, insightKey)
+			boolVal, ok := value.(bool)
+			if ok && boolVal {
+				count++
+			}
+		}
+
+		// Calculate the percentage
+		if segmentCount > 0 {
+			insightMetrics[insightKey] = fmt.Sprintf("%d%%", int(math.Round((float64(count)/float64(segmentCount))*100)))
+		} else {
+			insightMetrics[insightKey] = "N/A"
+		}
+	}
+
+	return insightMetrics, nil
+}
+
+func getInsightKeys(analysis *analyze.Segment, recursive bool) []string {
+	allKeys := []string{}
+	for key := range analysis.Insights {
+		if !slices.Contains(allKeys, key) {
+			allKeys = append(allKeys, key)
+		}
+	}
+
+	if recursive {
+		for _, segment := range analysis.Segments {
+			segmentKeys := getInsightKeys(segment, recursive)
+			for _, key := range segmentKeys {
+				if !slices.Contains(allKeys, key) {
+					allKeys = append(allKeys, key)
+				}
+			}
+		}
+	}
+
+	sort.Strings(allKeys)
+
+	return allKeys
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 )
 
 type Template struct {
@@ -29,6 +30,16 @@ func Load(path string) ([]*Template, error) {
 	if err := json.Unmarshal(templateBytes, &templates); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal file %s: %w", path, err)
 	}
+
+	slices.SortFunc(templates, func(a *Template, b *Template) int {
+		if a.Title < b.Title {
+			return -1
+		} else if a.Title > b.Title {
+			return 1
+		}
+
+		return 0
+	})
 
 	return templates, nil
 }
