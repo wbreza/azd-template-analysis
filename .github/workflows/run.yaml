@@ -1,9 +1,8 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches:
-      - main
+  schedule:
+    - cron: "0 0 * * *" # Runs at midnight UTC every day
   workflow_dispatch:
 
 permissions:
@@ -44,4 +43,5 @@ jobs:
           body_path: output/output.md
           draft: false
           prerelease: false
+          make_latest: true
           files: output/**/*
