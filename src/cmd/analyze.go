@@ -79,6 +79,14 @@ func newAnalyzeCmd(root *cobra.Command) {
 				}
 			}
 
+			runFile, err := os.Create(filepath.Join(flags.outputDir, "run.yaml"))
+			if err != nil {
+				return fmt.Errorf("failed to create run file: %w", err)
+			}
+
+			defer runFile.Close()
+			color.Output = runFile
+
 			resultBytes, err := json.MarshalIndent(allResults, "", " ")
 			if err != nil {
 				return fmt.Errorf("failed to marshal results: %w", err)
@@ -96,7 +104,11 @@ func newAnalyzeCmd(root *cobra.Command) {
 				return fmt.Errorf("failed to write root analysis to csv: %w", err)
 			}
 
-			writeMetrics("Templates", "Based on all templates", templateMetrics)
+			templateSection := analyze.MetricSection{
+				Title:       "Templates",
+				Description: "Based on all templates",
+				Metrics:     templateMetrics,
+			}
 
 			// Write project results
 			projectsFilePath := filepath.Join(flags.outputDir, "projects.csv")
@@ -105,7 +117,11 @@ func newAnalyzeCmd(root *cobra.Command) {
 				return fmt.Errorf("failed to write root analysis to csv: %w", err)
 			}
 
-			writeMetrics("Projects", "Based on all templates with azure.yaml", projectMetrics)
+			projectSection := analyze.MetricSection{
+				Title:       "Projects",
+				Description: "Based on all templates with azure.yaml",
+				Metrics:     projectMetrics,
+			}
 
 			// Write hook results
 			hooksFilePath := filepath.Join(flags.outputDir, "hooks.csv")
@@ -114,7 +130,27 @@ func newAnalyzeCmd(root *cobra.Command) {
 				return fmt.Errorf("failed to write hooks analysis to csv: %w", err)
 			}
 
-			writeMetrics("Hooks", "Based on templates that use hooks", hookMetrics)
+			hookSection := analyze.MetricSection{
+				Title:       "Hooks",
+				Description: "Based on templates that use hooks",
+				Metrics:     hookMetrics,
+			}
+
+			fmt.Print(templateSection.String())
+			fmt.Print(projectSection.String())
+			fmt.Print(hookSection.String())
+
+			// Write markdown
+			markdownFile, err := os.Create(filepath.Join(flags.outputDir, "output.md"))
+			if err != nil {
+				return fmt.Errorf("failed to create markdown file: %w", err)
+			}
+
+			defer markdownFile.Close()
+
+			fmt.Fprint(markdownFile, templateSection.Markdown())
+			fmt.Fprint(markdownFile, projectSection.Markdown())
+			fmt.Fprint(markdownFile, hookSection.Markdown())
 
 			return nil
 		},
@@ -125,21 +161,6 @@ func newAnalyzeCmd(root *cobra.Command) {
 	analyze.Flags().StringVarP(&flags.outputDir, "output", "o", "", "Path to the output directory.")
 
 	root.AddCommand(analyze)
-}
-
-func writeMetrics(title string, description string, metrics map[string]string) {
-	sortedKeys := []string{}
-	for k := range metrics {
-		sortedKeys = append(sortedKeys, k)
-	}
-	sort.Strings(sortedKeys)
-
-	fmt.Println()
-	color.HiWhite("# %s Metrics: (%s)", title, description)
-	fmt.Println()
-	for _, key := range sortedKeys {
-		color.HiBlack("- %s: %s", key, metrics[key])
-	}
 }
 
 func writeAnalysisToCsv(filePath string, allResults []*analyze.TemplateWithResults, segmentFilter string, recursive bool) (map[string]string, error) {

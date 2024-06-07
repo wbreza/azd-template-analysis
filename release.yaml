@@ -1,0 +1,171 @@
+Template '..\templates\ai-samples' analyzed successfully.
+Template '..\templates\ZipDeploy-AzFunc' analyzed successfully.
+Template '..\templates\OutputCacheOpenAI' analyzed successfully.
+Template '..\templates\eShop' analyzed successfully.
+Template '..\templates\azd-ai-starter' analyzed successfully.
+Template '..\templates\azd-aistudio-starter' analyzed successfully.
+Template '..\templates\openai-apim-lb' analyzed successfully.
+Template '..\templates\ais-apim-openai' analyzed successfully.
+Template '..\templates\function-eventhub-vnet' analyzed successfully.
+Template '..\templates\function-javascript-ai-openai-chatgpt' analyzed successfully.
+Template '..\templates\function-python-ai-openai-chatgpt' analyzed successfully.
+Template '..\templates\function-python-ai-langchain' analyzed successfully.
+Template '..\templates\function-csharp-ai-textsummarize' analyzed successfully.
+Template '..\templates\function-python-ai-textsummarize' analyzed successfully.
+Template '..\templates\aks-store-demo' analyzed successfully.
+Template '..\templates\aoai-logging-with-apim' analyzed successfully.
+Template '..\templates\azure-sql-db-session-recommender-v2' analyzed successfully.
+Template '..\templates\azure-sql-db-session-recommender' analyzed successfully.
+Template '..\templates\openai-aca-lb' analyzed successfully.
+Template '..\templates\LockedDownChatBot' analyzed successfully.
+Template '..\templates\azd-deployment-environments' analyzed successfully.
+Template '..\templates\azd-blazor' analyzed successfully.
+Template '..\templates\chat-with-your-data-solution-accelerator' analyzed successfully.
+Template '..\templates\azure-search-openai-demo-csharp' analyzed successfully.
+Template '..\templates\azure-search-openai-demo' analyzed successfully.
+Template '..\templates\azure-search-openai-javascript' analyzed successfully.
+Template '..\templates\aks-app-template' analyzed successfully.
+Template '..\templates\todo-java-mongo-aca' analyzed successfully.
+Template '..\templates\todo-nodejs-mongo-aca' analyzed successfully.
+Template '..\templates\todo-python-mongo-aca' analyzed successfully.
+Template '..\templates\contoso-chat' analyzed successfully.
+Template '..\templates\agent-openai-python-prompty' analyzed successfully.
+Template '..\templates\docusaurus-aca' analyzed successfully.
+Template '..\templates\servicebus-dotnet-functionapp' analyzed successfully.
+Template '..\templates\azure-appconfig-aks' analyzed successfully.
+Template '..\templates\contoso-real-estate' analyzed successfully.
+Template '..\templates\ASA-Samples-Event-Driven-Application' analyzed successfully.
+Template '..\templates\simple-fastapi-container' analyzed successfully.
+Template '..\templates\fastapi-on-azure-functions' analyzed successfully.
+Template '..\templates\fastapi-azure-function-apim' analyzed successfully.
+Template '..\templates\musicbinder-azd' analyzed successfully.
+Template '..\templates\simple-flask-api-container' analyzed successfully.
+Template '..\templates\flask-charts-api-container-app' analyzed successfully.
+Template '..\templates\flask-gallery-container-app' analyzed successfully.
+Template '..\templates\flask-surveys-container-app' analyzed successfully.
+Template '..\templates\agent-python-openai-prompty-langchain' analyzed successfully.
+Template '..\templates\agent-openai-python-prompty-langchain-pinecone' analyzed successfully.
+Template '..\templates\gs-spring-boot-for-azure' analyzed successfully.
+Template '..\templates\azure-search-openai-demo-java' analyzed successfully.
+Template '..\templates\app-templates-java-openai-springapps' analyzed successfully.
+Template '..\templates\jupyter-mercury-aca' analyzed successfully.
+Template '..\templates\todo-nodejs-mongo-aks' analyzed successfully.
+Template '..\templates\langfuse-on-azure' analyzed successfully.
+Template '..\templates\bindings-dapr-csharp-cron-postgres' analyzed successfully.
+Template '..\templates\bindings-dapr-nodejs-cron-postgres' analyzed successfully.
+Template '..\templates\bindings-dapr-python-cron-postgres' analyzed successfully.
+Template '..\templates\pubsub-dapr-csharp-servicebus' analyzed successfully.
+Template '..\templates\pubsub-dapr-aks-java' analyzed successfully.
+Template '..\templates\pubsub-dapr-nodejs-servicebus' analyzed successfully.
+Template '..\templates\pubsub-dapr-python-servicebus' analyzed successfully.
+Template '..\templates\svc-invoke-dapr-csharp' analyzed successfully.
+Template '..\templates\svc-invoke-dapr-nodejs' analyzed successfully.
+Template '..\templates\svc-invoke-dapr-python' analyzed successfully.
+Template '..\templates\GPT-RAG' analyzed successfully.
+Template '..\templates\nextjs-aca' analyzed successfully.
+Template '..\templates\azure-postgres-pgvector-python' analyzed successfully.
+Template '..\templates\summarization-openai-python-promptflow' analyzed successfully.
+Template '..\templates\django-quiz-app' analyzed successfully.
+Template '..\templates\msdocs-django-postgresql-sample-app' analyzed successfully.
+Template '..\templates\azure-django-postgres-aca' analyzed successfully.
+Template '..\templates\flask-webapp-mysql-db' analyzed successfully.
+Template '..\templates\flask-db-quiz-example' analyzed successfully.
+Template '..\templates\msdocs-flask-postgresql-sample-app' analyzed successfully.
+Template '..\templates\rag-postgres-openai-python' analyzed successfully.
+Template '..\templates\rag-semantic-kernel-mongodb-vcore' analyzed successfully.
+Template '..\templates\react-component-toolkit-openai-demo' analyzed successfully.
+Template '..\templates\ais-apim-odata-reactjs' analyzed successfully.
+Template '..\templates\todo-csharp-cosmos-sql' analyzed successfully.
+Template '..\templates\todo-csharp-sql' analyzed successfully.
+Template '..\templates\todo-java-mongo' analyzed successfully.
+Template '..\templates\todo-nodejs-mongo' analyzed successfully.
+Template '..\templates\todo-nodejs-mongo-terraform' analyzed successfully.
+Template '..\templates\todo-python-mongo' analyzed successfully.
+Template '..\templates\todo-python-mongo-terraform' analyzed successfully.
+Template '..\templates\GameLeaderboard' analyzed successfully.
+Template '..\templates\reliable-web-app-pattern-dotnet' analyzed successfully.
+Template '..\templates\remix-aca' analyzed successfully.
+Template '..\templates\RockPaperOrleans' analyzed successfully.
+Template '..\templates\app-service-javascript-sap-cap-quickstart' analyzed successfully.
+Template '..\templates\app-service-javascript-sap-cloud-sdk-quickstart' analyzed successfully.
+Template '..\templates\functions-javascript-sap-cloud-sdk-quickstart' analyzed successfully.
+Template '..\templates\azure-rails-starter' analyzed successfully.
+Template '..\templates\django-on-azure' analyzed successfully.
+Template '..\templates\serverless-chat-langchainjs' analyzed successfully.
+Template '..\templates\servicebus-csharp-function-dataverse' analyzed successfully.
+Template '..\templates\enterprise-azureai' analyzed successfully.
+Template '..\templates\chatgpt-quickstart' analyzed successfully.
+Template '..\templates\openai-chat-app-quickstart' analyzed successfully.
+Template '..\templates\simple-flask-app-terraform' analyzed successfully.
+Template '..\templates\simple-flask-azd' analyzed successfully.
+Template '..\templates\simple-streamlit-azd' analyzed successfully.
+Template '..\templates\spring-chatgpt-sample' analyzed successfully.
+Template '..\templates\spring-petclinic-java-mysql' analyzed successfully.
+Template '..\templates\azd-starter-bicep' analyzed successfully.
+Template '..\templates\azd-starter-terraform' analyzed successfully.
+Template '..\templates\staticmaps-function' analyzed successfully.
+Template '..\templates\todo-csharp-sql-swa-func' analyzed successfully.
+Template '..\templates\todo-nodejs-mongo-swa-func' analyzed successfully.
+Template '..\templates\todo-python-mongo-swa-func' analyzed successfully.
+Template '..\templates\ASA-Samples-Web-Application' analyzed successfully.
+Template '..\templates\azd-devcenter' analyzed successfully.
+Template '..\templates\orleans-url-shortener' analyzed successfully.
+Template '..\templates\simple-fastapi-snow-azd' analyzed successfully.
+Template '..\templates\apptemplate-wordpress-on-ACA' analyzed successfully.
+
+# Templates Metrics: (Based on all templates)
+
+- hasAzdo: 32%
+- hasAzureYaml: 96%
+- hasDevcontainer: 81%
+- hasGithub: 93%
+- hasInfra: 96%
+- infraBicep: 91%
+- infraTerraform: 6%
+- isCommunity: 32%
+- isMsft: 68%
+- tagCount: 15.43 (Avg)
+
+# Projects Metrics: (Based on all templates with azure.yaml)
+
+- hasHooks: 48%
+- hasMetadata: 90%
+- hasServices: 87%
+- hasWorkflows: 17%
+- host-ai.endpoint: 3%
+- host-aks: 6%
+- host-appservice: 27%
+- host-containerapp: 31%
+- host-function: 22%
+- host-springapp: 5%
+- host-staticwebapp: 8%
+- lang-dotnet: 20%
+- lang-java: 8%
+- lang-javascript: 6%
+- lang-python: 39%
+- serviceCount: 1.28 (Avg)
+
+# Hooks Metrics: (Based on templates that use hooks)
+
+- hasProjectHooks: 77%
+- hasServiceHooks: 42%
+- hooks-loc: 134.46 (Avg)
+- type-postbuild: 0%
+- type-postdeploy: 38%
+- type-postdown: 2%
+- type-postpackage: 2%
+- type-postprovision: 60%
+- type-postrestore: 0%
+- type-postup: 8%
+- type-prebuild: 0%
+- type-predeploy: 19%
+- type-predown: 4%
+- type-prepackage: 33%
+- type-preprovision: 23%
+- type-prerestore: 2%
+- type-preup: 0%
+- usesAzCli: 25%
+- usesAzCliLogin: 4%
+- usesAzd: 48%
+- usesInlineScript: 62%
+- usesOsVariantScripts: 81%
