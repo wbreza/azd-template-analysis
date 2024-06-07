@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -130,6 +131,23 @@ func analyzeTemplate(ctx AnalysisContext, template *templates.Template, analysis
 	azdProject, err := project.Load(templatePath)
 	templateSegment.Insights["hasAzureYaml"] = NewInsight(BoolInsight, azdProject != nil && err == nil)
 
+	analyzeFileSystem(ctx, template, templateSegment)
+
+	return nil
+}
+
+func analyzeFileSystem(ctx AnalysisContext, template *templates.Template, root *Segment) error {
+	templatePath := filepath.Join(ctx.WorkingDirectory, filepath.Base(template.Source))
+	infraPath := filepath.Join(templatePath, "infra")
+
+	root.Insights["hasInfra"] = NewInsight(BoolInsight, hasDir(templatePath, "infra"))
+	root.Insights["hasGithub"] = NewInsight(BoolInsight, hasDir(templatePath, ".github"))
+	root.Insights["hasAzdo"] = NewInsight(BoolInsight, hasDir(templatePath, ".azdo"))
+	root.Insights["hasDevcontainer"] = NewInsight(BoolInsight, hasDir(templatePath, ".devcontainer"))
+
+	root.Insights["infraBicep"] = NewInsight(BoolInsight, hasFilePattern(infraPath, "*.bicep"))
+	root.Insights["infraTerraform"] = NewInsight(BoolInsight, hasFilePattern(infraPath, "*.tf"))
+
 	return nil
 }
 
@@ -221,6 +239,41 @@ func analyzeHooks(ctx AnalysisContext, template *templates.Template, root *Segme
 	}
 
 	return nil
+}
+
+func hasFilePattern(path string, pattern string) bool {
+	matches := []string{}
+
+	err := filepath.WalkDir(path, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !entry.IsDir() {
+			matched, err := filepath.Match(pattern, entry.Name())
+			if err != nil {
+				return err
+			}
+			if matched {
+				matches = append(matches, path)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return false
+	}
+
+	return len(matches) > 0
+}
+
+func hasDir(root string, dirName string) bool {
+	dirPath := filepath.Join(root, dirName)
+	_, err := os.Stat(dirPath)
+
+	return err == nil
 }
 
 func hasHostType(azdProject project.Project, hostType string) bool {

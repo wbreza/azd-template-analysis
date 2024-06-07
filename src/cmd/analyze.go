@@ -17,8 +17,9 @@ import (
 )
 
 type analyzeFlags struct {
-	template string
-	filePath string
+	template  string
+	filePath  string
+	outputDir string
 }
 
 func newAnalyzeCmd(root *cobra.Command) {
@@ -27,12 +28,21 @@ func newAnalyzeCmd(root *cobra.Command) {
 	analyze := &cobra.Command{
 		Use: "analyze",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get current working directory: %w", err)
+			}
+
 			if flags.filePath == "" {
-				cwd, err := os.Getwd()
-				if err != nil {
-					return fmt.Errorf("failed to get current working directory: %w", err)
-				}
 				flags.filePath = filepath.Join(cwd, "templates")
+			}
+
+			if flags.outputDir == "" {
+				flags.outputDir = filepath.Join(cwd, "output")
+			}
+
+			if err := os.MkdirAll(flags.outputDir, 0755); err != nil {
+				return fmt.Errorf("failed to create output directory: %w", err)
 			}
 
 			templateList, err := templates.Load(filepath.Join(flags.filePath, "templates.json"))
@@ -75,12 +85,12 @@ func newAnalyzeCmd(root *cobra.Command) {
 			}
 
 			// Write raw results
-			if err := os.WriteFile(filepath.Join(flags.filePath, "raw.json"), resultBytes, 0644); err != nil {
+			if err := os.WriteFile(filepath.Join(flags.outputDir, "raw.json"), resultBytes, 0644); err != nil {
 				return fmt.Errorf("failed to write results: %w", err)
 			}
 
 			// Write template results
-			templatesFilePath := filepath.Join(flags.filePath, "templates.csv")
+			templatesFilePath := filepath.Join(flags.outputDir, "templates.csv")
 			templateMetrics, err := writeAnalysisToCsv(templatesFilePath, allResults, "template", false)
 			if err != nil {
 				return fmt.Errorf("failed to write root analysis to csv: %w", err)
@@ -88,8 +98,8 @@ func newAnalyzeCmd(root *cobra.Command) {
 
 			writeMetrics("Templates", "Based on all templates", templateMetrics)
 
-			// Write template results
-			projectsFilePath := filepath.Join(flags.filePath, "projects.csv")
+			// Write project results
+			projectsFilePath := filepath.Join(flags.outputDir, "projects.csv")
 			projectMetrics, err := writeAnalysisToCsv(projectsFilePath, allResults, "project", false)
 			if err != nil {
 				return fmt.Errorf("failed to write root analysis to csv: %w", err)
@@ -98,7 +108,7 @@ func newAnalyzeCmd(root *cobra.Command) {
 			writeMetrics("Projects", "Based on all templates with azure.yaml", projectMetrics)
 
 			// Write hook results
-			hooksFilePath := filepath.Join(flags.filePath, "hooks.csv")
+			hooksFilePath := filepath.Join(flags.outputDir, "hooks.csv")
 			hookMetrics, err := writeAnalysisToCsv(hooksFilePath, allResults, "hooks", true)
 			if err != nil {
 				return fmt.Errorf("failed to write hooks analysis to csv: %w", err)
@@ -112,6 +122,7 @@ func newAnalyzeCmd(root *cobra.Command) {
 
 	analyze.Flags().StringVarP(&flags.template, "template", "t", "", "Template to analyze.")
 	analyze.Flags().StringVarP(&flags.filePath, "file", "f", "", "Path to the template sync directory.")
+	analyze.Flags().StringVarP(&flags.outputDir, "output", "o", "", "Path to the output directory.")
 
 	root.AddCommand(analyze)
 }
@@ -124,9 +135,10 @@ func writeMetrics(title string, description string, metrics map[string]string) {
 	sort.Strings(sortedKeys)
 
 	fmt.Println()
-	color.HiWhite("%s Metrics: (%s)", title, description)
+	color.HiWhite("# %s Metrics: (%s)", title, description)
+	fmt.Println()
 	for _, key := range sortedKeys {
-		color.HiBlack("%s: %s", key, metrics[key])
+		color.HiBlack("- %s: %s", key, metrics[key])
 	}
 }
 
