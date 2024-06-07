@@ -36,8 +36,9 @@ jobs:
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
-          body_path: output/output.md
           name: Analysis ${{ github.run_number }}
+          tag_name: analysis-${{ github.run_number }}
+          body_path: output/output.md
           draft: false
           prerelease: false
           files: output/**/*
