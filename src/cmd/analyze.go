@@ -79,14 +79,6 @@ func newAnalyzeCmd(root *cobra.Command) {
 				}
 			}
 
-			runFile, err := os.Create(filepath.Join(flags.outputDir, "run.yaml"))
-			if err != nil {
-				return fmt.Errorf("failed to create run file: %w", err)
-			}
-
-			defer runFile.Close()
-			color.Output = runFile
-
 			resultBytes, err := json.MarshalIndent(allResults, "", " ")
 			if err != nil {
 				return fmt.Errorf("failed to marshal results: %w", err)
