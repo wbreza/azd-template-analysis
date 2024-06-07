@@ -40,6 +40,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: Analysis (${{ env.NOW }})
+          tag_name: analysis-${{ github.run_number }}
           body_path: output/output.md
           draft: false
           prerelease: false
