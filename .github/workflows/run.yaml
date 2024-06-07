@@ -37,7 +37,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body_path: output/output.md
-          name: Analysis (${{ github.event.time }})
-          draft: true
-          prerelease: true
+          name: Analysis ${{ github.run_number }}
+          draft: false
+          prerelease: false
           files: output/**/*
