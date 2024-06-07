@@ -1,9 +1,7 @@
 package analyze
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -17,7 +15,7 @@ import (
 type Segment struct {
 	Errors   []string            `json:"errors"`
 	Data     map[string]any      `json:"data"`
-	Insights map[string]any      `json:"insights"`
+	Insights map[string]*Insight `json:"insights"`
 	Segments map[string]*Segment `json:"segments"`
 }
 
@@ -25,7 +23,7 @@ func NewSegment() *Segment {
 	return &Segment{
 		Errors:   []string{},
 		Data:     map[string]any{},
-		Insights: map[string]any{},
+		Insights: map[string]*Insight{},
 		Segments: map[string]*Segment{},
 	}
 }
@@ -56,8 +54,8 @@ func AnalyzeTemplate(ctx AnalysisContext, template *templates.Template) (*Segmen
 		analyzeTemplate,
 	}
 
-	for _, f := range analysisFuncs {
-		if err := f(ctx, template, root); err != nil {
+	for _, analyzeFunc := range analysisFuncs {
+		if err := analyzeFunc(ctx, template, root); err != nil {
 			root.Errors = append(root.Errors, err.Error())
 		}
 	}
@@ -65,31 +63,102 @@ func AnalyzeTemplate(ctx AnalysisContext, template *templates.Template) (*Segmen
 	return root, nil
 }
 
+func HasSegment(analysis *Segment, key string) bool {
+	_, has := analysis.Segments[key]
+	if !has {
+		for _, segment := range analysis.Segments {
+			has = HasSegment(segment, key)
+			if has {
+				break
+			}
+		}
+	}
+
+	return has
+}
+
+func HasInsightValue[T comparable](analysis *Segment, key string, value T) bool {
+	results, has := GetInsight[T](analysis, key)
+	if !has {
+		return false
+	}
+
+	return slices.Contains(results, value)
+}
+
+func GetTopInsight[T comparable](segment *Segment, key string) (T, bool) {
+	var zero T
+
+	values, has := GetInsight[any](segment, key)
+	if !has {
+		return zero, false
+	}
+
+	return values[0].(T), true
+}
+
+func GetInsight[T comparable](analysis *Segment, key string) ([]T, bool) {
+	results := []T{}
+
+	insight, has := analysis.Insights[key]
+	if has {
+		value, ok := insight.Value.(T)
+		if ok {
+			results = append(results, value)
+		}
+	}
+
+	for _, segment := range analysis.Segments {
+		childResults, has := GetInsight[T](segment, key)
+		if has {
+			results = append(results, childResults...)
+		}
+	}
+
+	return results, len(results) > 0
+}
+
 func analyzeTemplate(ctx AnalysisContext, template *templates.Template, analysis *Segment) error {
-	analysis.Insights["tagCount"] = len(template.Author)
-	analysis.Insights["isCommunity"] = slices.Contains(template.Tags, "community")
-	analysis.Insights["isMsft"] = slices.Contains(template.Tags, "msft")
+	templateSegment := NewSegment()
+	analysis.Segments["template"] = templateSegment
+
+	templateSegment.Insights["tagCount"] = NewInsight(NumberInsight, len(template.Author))
+	templateSegment.Insights["isCommunity"] = NewInsight(BoolInsight, slices.Contains(template.Tags, "community"))
+	templateSegment.Insights["isMsft"] = NewInsight(BoolInsight, slices.Contains(template.Tags, "msft"))
+
+	templatePath := filepath.Join(ctx.WorkingDirectory, filepath.Base(template.Source))
+	azdProject, err := project.Load(templatePath)
+	templateSegment.Insights["hasAzureYaml"] = NewInsight(BoolInsight, azdProject != nil && err == nil)
 
 	return nil
 }
 
-func analyzeProject(ctx AnalysisContext, template *templates.Template, analysis *Segment) error {
+func analyzeProject(ctx AnalysisContext, template *templates.Template, root *Segment) error {
 	templatePath := filepath.Join(ctx.WorkingDirectory, filepath.Base(template.Source))
 	azdProject, err := project.Load(templatePath)
+	if err != nil {
+		return err
+	}
 
-	analysis.Insights["missingAzureYamlAtRoot"] = errors.Is(err, fs.ErrNotExist)
-	analysis.Insights["hasProjectHooks"] = HasSegment(analysis, "hooks")
-	analysis.Insights["hasWorkflows"] = azdProject != nil && len(azdProject.Workflows) > 0
-	analysis.Insights["hasMetadata"] = azdProject != nil && azdProject.Metadata != nil
-	analysis.Insights["hasServices"] = azdProject != nil && len(azdProject.Services) > 0
+	if azdProject == nil {
+		return nil
+	}
+
+	projectSegment := NewSegment()
+	root.Segments["project"] = projectSegment
+
+	projectSegment.Insights["hasHooks"] = NewInsight(BoolInsight, HasInsightValue(root, "hasProjectHooks", true) || HasInsightValue(root, "hasServiceHooks", true))
+	projectSegment.Insights["hasWorkflows"] = NewInsight(BoolInsight, len(azdProject.Workflows) > 0)
+	projectSegment.Insights["hasMetadata"] = NewInsight(BoolInsight, azdProject.Metadata != nil)
+	projectSegment.Insights["hasServices"] = NewInsight(BoolInsight, len(azdProject.Services) > 0)
 
 	if azdProject != nil {
-		analysis.Insights["serviceCount"] = len(azdProject.Services)
+		projectSegment.Insights["serviceCount"] = NewInsight(NumberInsight, len(azdProject.Services))
 	}
 
 	hostTypes := []string{"appservice", "containerapp", "function", "springapp", "aks", "staticwebapp", "ai.endpoint"}
 	for _, hostType := range hostTypes {
-		analysis.Insights[fmt.Sprintf("host-%s", hostType)] = azdProject != nil && hasHostType(*azdProject, hostType)
+		projectSegment.Insights[fmt.Sprintf("host-%s", hostType)] = NewInsight(BoolInsight, hasHostType(*azdProject, hostType))
 	}
 
 	languages := map[string][]string{
@@ -99,28 +168,59 @@ func analyzeProject(ctx AnalysisContext, template *templates.Template, analysis 
 		"python":     {"python", "py"},
 	}
 	for key, languageSet := range languages {
-		analysis.Insights[fmt.Sprintf("lang-%s", key)] = azdProject != nil && hasLanguage(*azdProject, languageSet)
+		projectSegment.Insights[fmt.Sprintf("lang-%s", key)] = NewInsight(BoolInsight, hasLanguage(*azdProject, languageSet))
 	}
 
 	return nil
 }
 
-func HasSegment(analysis *Segment, key string) bool {
-	_, has := analysis.Segments[key]
-	return has
-}
-
-func GetInsight(analysis *Segment, key string) any {
-	value, has := analysis.Insights[key]
-	if has {
-		return value
+func analyzeHooks(ctx AnalysisContext, template *templates.Template, root *Segment) error {
+	templatePath := filepath.Join(ctx.WorkingDirectory, filepath.Base(template.Source))
+	azdProject, err := project.Load(templatePath)
+	if err != nil {
+		return err
 	}
 
-	for _, segment := range analysis.Segments {
-		return GetInsight(segment, key)
+	hooksRootSegment := NewSegment()
+	hasProjectHooks := len(azdProject.Hooks) > 0
+
+	if hasProjectHooks {
+		projectHooks := NewSegment()
+		hooksRootSegment.Segments["project"] = projectHooks
+
+		// Project Hooks
+		analyzeHooksMap(azdProject.Hooks, projectHooks, templatePath)
 	}
 
-	return ""
+	hasServiceHooks := false
+	serviceHooks := NewSegment()
+
+	// Service Hooks
+	for serviceName, service := range azdProject.Services {
+		if len(service.Hooks) == 0 {
+			continue
+		}
+
+		serviceSegment := NewSegment()
+		serviceHooks.Segments[serviceName] = serviceSegment
+		hasServiceHooks = true
+
+		servicePath := filepath.Join(templatePath, service.RelativePath)
+		analyzeHooksMap(service.Hooks, serviceSegment, servicePath)
+	}
+
+	if hasServiceHooks {
+		hooksRootSegment.Segments["services"] = serviceHooks
+	}
+
+	hooksRootSegment.Insights["hasProjectHooks"] = NewInsight(BoolInsight, hasProjectHooks)
+	hooksRootSegment.Insights["hasServiceHooks"] = NewInsight(BoolInsight, hasServiceHooks)
+
+	if hasProjectHooks || hasServiceHooks {
+		root.Segments["hooks"] = hooksRootSegment
+	}
+
+	return nil
 }
 
 func hasHostType(azdProject project.Project, hostType string) bool {
@@ -151,27 +251,14 @@ func hasLanguage(azdProject project.Project, languageSet []string) bool {
 	return false
 }
 
-func analyzeHooks(ctx AnalysisContext, template *templates.Template, analysis *Segment) error {
-	templatePath := filepath.Join(ctx.WorkingDirectory, filepath.Base(template.Source))
-	azdProject, err := project.Load(templatePath)
-	if err != nil {
-		return err
-	}
-
-	if len(azdProject.Hooks) == 0 {
-		return nil
-	}
-
-	hooksRootSegment := NewSegment()
-	analysis.Segments["hooks"] = hooksRootSegment
-
+func analyzeHooksMap(hooks map[string]project.Hook, root *Segment, filePath string) {
 	totalLocCount := 0
 
-	for hookName, hook := range azdProject.Hooks {
+	for hookName, hook := range hooks {
 		locCount := 0
 
 		hookSegment := NewSegment()
-		hooksRootSegment.Segments[hookName] = hookSegment
+		root.Segments[hookName] = hookSegment
 
 		hookRun := hook.Run
 		if hookRun == "" {
@@ -181,26 +268,26 @@ func analyzeHooks(ctx AnalysisContext, template *templates.Template, analysis *S
 			hookRun = hook.Windows.Run
 		}
 		if hookRun == "" {
-			hookSegment.Errors = append(hooksRootSegment.Errors, fmt.Sprintf("%s hook missing run command", hookName))
-			return nil
+			hookSegment.Errors = append(root.Errors, fmt.Sprintf("%s hook missing run command", hookName))
+			return
 		}
 
 		hasWindowsScript := hook.Windows != nil && hook.Windows.Run != ""
 		hasPosixScript := hook.Posix != nil && hook.Posix.Run != ""
 
 		usesOsVariantScripts := hasWindowsScript && hasPosixScript
-		hookSegment.Insights["usesOsVariantScripts"] = usesOsVariantScripts
+		hookSegment.Insights["usesOsVariantScripts"] = NewInsight(BoolInsight, usesOsVariantScripts)
 
 		var hookScript string
-		scriptPath := filepath.Join(templatePath, hookRun)
+		scriptPath := filepath.Join(filePath, hookRun)
 		_, err := os.Stat(scriptPath)
 
 		// Inline script
 		if err != nil {
-			hookSegment.Insights["usesInlineScript"] = true
+			hookSegment.Insights["usesInlineScript"] = NewInsight(BoolInsight, true)
 			hookScript = hookRun
 		} else { // File script
-			hookSegment.Insights["usesInlineScript"] = false
+			hookSegment.Insights["usesInlineScript"] = NewInsight(BoolInsight, false)
 			hookBytes, err := os.ReadFile(scriptPath)
 			if err != nil {
 				hookSegment.Errors = append(hookSegment.Errors, fmt.Sprintf("Failed reading hook file '%s': %v", scriptPath, err))
@@ -214,7 +301,7 @@ func analyzeHooks(ctx AnalysisContext, template *templates.Template, analysis *S
 
 		embeddedScripts := scriptRegex.FindAllString(hookScript, -1)
 		for _, scriptPath := range embeddedScripts {
-			embeddedScriptPath := filepath.Join(templatePath, scriptPath)
+			embeddedScriptPath := filepath.Join(filePath, scriptPath)
 			scriptBytes, err := os.ReadFile(embeddedScriptPath)
 			if err != nil {
 				hookSegment.Errors = append(hookSegment.Errors, fmt.Sprintf("Failed reading embedded script '%s': %v", embeddedScriptPath, err))
@@ -227,7 +314,7 @@ func analyzeHooks(ctx AnalysisContext, template *templates.Template, analysis *S
 		for heuristicKey, heuristic := range heuristicMap {
 			for key, script := range allScripts {
 				hookSegment.Data[key] = script
-				hookSegment.Insights[heuristicKey] = heuristic.MatchString(script)
+				hookSegment.Insights[heuristicKey] = NewInsight(BoolInsight, heuristic.MatchString(script))
 			}
 		}
 
@@ -235,11 +322,9 @@ func analyzeHooks(ctx AnalysisContext, template *templates.Template, analysis *S
 			locCount += len(strings.Split(script, "\n"))
 		}
 
-		hookSegment.Insights["loc"] = locCount
+		hookSegment.Insights["hooks-loc"] = NewInsight(NumberInsight, locCount)
 		totalLocCount += locCount
 	}
-
-	hooksRootSegment.Insights["loc"] = totalLocCount
 
 	hookNames := []string{
 		"restore",
@@ -256,11 +341,11 @@ func analyzeHooks(ctx AnalysisContext, template *templates.Template, analysis *S
 	for _, hookName := range hookNames {
 		for _, phase := range phases {
 			hookName := fmt.Sprintf("%s%s", phase, hookName)
-			hooksRootSegment.Insights[fmt.Sprintf("type-%s", hookName)] = HasSegment(hooksRootSegment, hookName)
+			root.Insights[fmt.Sprintf("type-%s", hookName)] = NewInsight(BoolInsight, HasSegment(root, hookName))
 		}
 	}
 
-	return nil
+	root.Insights["hooks-loc"] = NewInsight(NumberInsight, totalLocCount)
 }
 
 var scriptRegex = regexp.MustCompile(`([a-zA-Z]:[\\/]|[\\/])?((?:[a-zA-Z0-9_\-\.]+[\\/])*[a-zA-Z0-9_\-\.]+\.(sh|ps1))`)

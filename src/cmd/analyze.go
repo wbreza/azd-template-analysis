@@ -74,18 +74,30 @@ func newAnalyzeCmd(root *cobra.Command) {
 				return fmt.Errorf("failed to marshal results: %w", err)
 			}
 
-			if err := os.WriteFile(filepath.Join(flags.filePath, "results.json"), resultBytes, 0644); err != nil {
+			// Write raw results
+			if err := os.WriteFile(filepath.Join(flags.filePath, "raw.json"), resultBytes, 0644); err != nil {
 				return fmt.Errorf("failed to write results: %w", err)
 			}
 
-			rootFilePath := filepath.Join(flags.filePath, "templates.csv")
-			rootMetrics, err := writeAnalysisToCsv(rootFilePath, allResults, "", false)
+			// Write template results
+			templatesFilePath := filepath.Join(flags.filePath, "templates.csv")
+			templateMetrics, err := writeAnalysisToCsv(templatesFilePath, allResults, "template", false)
 			if err != nil {
 				return fmt.Errorf("failed to write root analysis to csv: %w", err)
 			}
 
-			writeMetrics("Root", "Based on all templates", rootMetrics)
+			writeMetrics("Templates", "Based on all templates", templateMetrics)
 
+			// Write template results
+			projectsFilePath := filepath.Join(flags.filePath, "projects.csv")
+			projectMetrics, err := writeAnalysisToCsv(projectsFilePath, allResults, "project", false)
+			if err != nil {
+				return fmt.Errorf("failed to write root analysis to csv: %w", err)
+			}
+
+			writeMetrics("Projects", "Based on all templates with azure.yaml", projectMetrics)
+
+			// Write hook results
 			hooksFilePath := filepath.Join(flags.filePath, "hooks.csv")
 			hookMetrics, err := writeAnalysisToCsv(hooksFilePath, allResults, "hooks", true)
 			if err != nil {
@@ -126,7 +138,7 @@ func writeAnalysisToCsv(filePath string, allResults []*analyze.TemplateWithResul
 
 	csvWriter := csv.NewWriter(csvFile)
 	allInsightKeys := []string{}
-
+	allInsights := map[string]*analyze.Insight{}
 	segmentCount := 0
 
 	for _, result := range allResults {
@@ -140,10 +152,11 @@ func writeAnalysisToCsv(filePath string, allResults []*analyze.TemplateWithResul
 		}
 
 		segmentCount++
-		resultKeys := getInsightKeys(segment, recursive)
-		for _, key := range resultKeys {
+		resultInsights := getInsightKeys(segment, recursive)
+		for key, insight := range resultInsights {
 			if !slices.Contains(allInsightKeys, key) {
 				allInsightKeys = append(allInsightKeys, key)
+				allInsights[key] = insight
 			}
 		}
 	}
@@ -172,7 +185,7 @@ func writeAnalysisToCsv(filePath string, allResults []*analyze.TemplateWithResul
 		}
 
 		for _, insightKey := range allInsightKeys {
-			insightValue := analyze.GetInsight(segment, insightKey)
+			insightValue, _ := analyze.GetTopInsight[any](segment, insightKey)
 			values = append(values, fmt.Sprint(insightValue))
 		}
 
@@ -184,83 +197,62 @@ func writeAnalysisToCsv(filePath string, allResults []*analyze.TemplateWithResul
 
 	insightMetrics := map[string]string{}
 
-	for _, insightKey := range allInsightKeys {
+	for key, insight := range allInsights {
 		count := 0
 
-		isBool := false
-		isNumber := true
-
 		for _, result := range allResults {
-			var intVal int
-			var boolVal bool
-
-			value := analyze.GetInsight(result.Analysis, insightKey)
-
-			switch v := value.(type) {
-			case int:
-				isNumber = true
-				intVal = int(v)
-			case int32:
-				isNumber = true
-				intVal = int(v)
-			case int64:
-				isNumber = true
-				intVal = int(v)
-			case float32:
-				isNumber = true
-				intVal = int(v)
-			case float64:
-				isNumber = true
-				intVal = int(v)
-			case bool:
-				isBool = true
-				boolVal = value.(bool)
+			segment := result.Analysis
+			if segmentFilter != "" {
+				if analyze.HasSegment(result.Analysis, segmentFilter) {
+					segment = result.Analysis.Segments[segmentFilter]
+				} else {
+					continue
+				}
 			}
 
-			if isBool && boolVal {
-				count++
-			}
-
-			if isNumber {
-				count += intVal
+			resolver := insight.Resolver()
+			switch insight.Type {
+			case analyze.BoolInsight:
+				boolVal, ok := resolver.Value(segment, key).(bool)
+				if ok && boolVal {
+					count++
+				}
+			case analyze.NumberInsight:
+				intVal, ok := resolver.Value(segment, key).(int)
+				if ok {
+					count += intVal
+				}
 			}
 		}
 
-		// Calculate the percentage
-		if segmentCount > 0 {
-			if isBool {
-				insightMetrics[insightKey] = fmt.Sprintf("%d%%", int(math.Round((float64(count)/float64(segmentCount))*100)))
-			} else if isNumber {
-				insightMetrics[insightKey] = fmt.Sprintf("%.2f (Avg)", float32(count)/float32(segmentCount))
-			}
-		} else {
-			insightMetrics[insightKey] = "N/A"
+		switch insight.Type {
+		case analyze.BoolInsight:
+			insightMetrics[key] = fmt.Sprintf("%d%%", int(math.Round((float64(count)/float64(segmentCount))*100)))
+		case analyze.NumberInsight:
+			insightMetrics[key] = fmt.Sprintf("%.2f (Avg)", float32(count)/float32(segmentCount))
+		default:
+			insightMetrics[key] = "N/A"
 		}
 	}
 
 	return insightMetrics, nil
 }
 
-func getInsightKeys(analysis *analyze.Segment, recursive bool) []string {
-	allKeys := []string{}
-	for key := range analysis.Insights {
-		if !slices.Contains(allKeys, key) {
-			allKeys = append(allKeys, key)
-		}
+func getInsightKeys(analysis *analyze.Segment, recursive bool) map[string]*analyze.Insight {
+	allInsights := map[string]*analyze.Insight{}
+
+	for key, insight := range analysis.Insights {
+		allInsights[key] = insight
 	}
 
 	if recursive {
 		for _, segment := range analysis.Segments {
-			segmentKeys := getInsightKeys(segment, recursive)
-			for _, key := range segmentKeys {
-				if !slices.Contains(allKeys, key) {
-					allKeys = append(allKeys, key)
-				}
+			segmentInsights := getInsightKeys(segment, recursive)
+			for key, insight := range segmentInsights {
+				allInsights[key] = insight
 			}
 		}
 	}
 
-	sort.Strings(allKeys)
-
-	return allKeys
+	return allInsights
 }

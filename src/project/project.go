@@ -16,6 +16,7 @@ type Project struct {
 	Workflows map[string]interface{} `json:"workflows"`
 	Metadata  *Metadata              `json:"metadata"`
 	Services  map[string]Service     `json:"services"`
+	Raw       string                 `json:"-"`
 }
 
 type Metadata struct {
@@ -30,8 +31,10 @@ type Hook struct {
 }
 
 type Service struct {
-	Host     string `json:"host"`
-	Language string `json:"language"`
+	Host         string          `json:"host"`
+	Language     string          `json:"language"`
+	Hooks        map[string]Hook `json:"hooks"`
+	RelativePath string          `json:"project"`
 }
 
 func Load(path string) (*Project, error) {
@@ -51,6 +54,8 @@ func Load(path string) (*Project, error) {
 	if err := yaml.Unmarshal(projectBytes, &azdProject); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal azure.yaml file %s: %w", azureYamlPath, err)
 	}
+
+	azdProject.Raw = string(projectBytes)
 
 	return &azdProject, nil
 }
