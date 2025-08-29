@@ -170,9 +170,7 @@ func analyzeProject(ctx AnalysisContext, template *templates.Template, root *Seg
 	projectSegment.Insights["hasMetadata"] = NewInsight(BoolInsight, azdProject.Metadata != nil)
 	projectSegment.Insights["hasServices"] = NewInsight(BoolInsight, len(azdProject.Services) > 0)
 
-	if azdProject != nil {
-		projectSegment.Insights["serviceCount"] = NewInsight(NumberInsight, len(azdProject.Services))
-	}
+	projectSegment.Insights["serviceCount"] = NewInsight(NumberInsight, len(azdProject.Services))
 
 	hostTypes := []string{"appservice", "containerapp", "function", "springapp", "aks", "staticwebapp", "ai.endpoint"}
 	for _, hostType := range hostTypes {
@@ -314,15 +312,15 @@ func analyzeHooksMap(hooks map[string]project.Hook, root *Segment, filePath stri
 		root.Segments[hookName] = hookSegment
 
 		hookRun := hook.Run
-		if hookRun == "" {
+		if hookRun == "" && hook.Posix != nil {
 			hookRun = hook.Posix.Run
 		}
-		if hookRun == "" {
+		if hookRun == "" && hook.Windows != nil {
 			hookRun = hook.Windows.Run
 		}
 		if hookRun == "" {
-			hookSegment.Errors = append(root.Errors, fmt.Sprintf("%s hook missing run command", hookName))
-			return
+			hookSegment.Errors = append(hookSegment.Errors, fmt.Sprintf("%s hook missing run command", hookName))
+			continue
 		}
 
 		hasWindowsScript := hook.Windows != nil && hook.Windows.Run != ""
